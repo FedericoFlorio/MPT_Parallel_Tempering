@@ -260,6 +260,64 @@ function tensor_b_t_over_time(A, P0, t, max_bound)
     return lista_B_T
 end
 
+
+# ============================================================================
+# TENSOR TRAIN DE EVOLUCIÓN DE LA DISTRIBUCIÓN DE PROBABILIDAD CON SWAP CON SALVA OPCIONAL
+# ============================================================================
+
+"""
+    tensor_b_t(A, P0, t, max_bound) Evoluciona la distribución de probabilidad inicial P0 a través de t 
+    pasos de tiempo usando la matriz de transición A en formato TensorTrain.
+# Argumentos
+- `A`: TensorTrain que representa la matriz de transición
+- `P0`: Vector de vectores con la distribución de probabilidad inicial en cada sitio
+- `t`: Número de pasos de tiempo a evolucionar
+- `max_bound`: Límite máximo para la compresión del TensorTrain
+"""
+function tensor_b_t_swap(A, P0, t, max_bound, s,  save = true)
+    N = length(A.tensors)               # Define N como la longitud de A.tensors
+    
+    
+
+    # Construye el TensorTrain inicial para la distribución P0
+    # Para cada sitio, crea un tensor de tamaño (1,1,Q) con las probabilidades iniciales.
+    B = TensorTrain([(@tullio _[1,1,x] := pi[x]) for pi in P0])    
+    if save
+        lista_B_T =[]
+        push!(lista_B_T, B)
+    end    
+    
+    # Itera sobre los pasos de tiempo, mostrando una barra de progreso.
+    @showprogress for _ in 1:t   
+
+        # Para cada sitio, toma el tensor de transición Ai y el tensor de probabilidad Bi
+        B = map(zip(A.tensors,B.tensors)) do (A_i, B_i)     
+            
+            # Realiza la suma sobre σ_t (el estado anterior), multiplicando el tensor de transición 
+            # por la distribución. El resultado es un nuevo tensor para el siguiente tiempo.
+            @tullio new_tensor_[m1,m2,n1,n2,sigma_t_plus] := A_i[m1,n1,sigma_t,sigma_t_plus] * B_i[m2,n2,sigma_t]
+
+            # Reordena las dimensiones para que los bonds estén agrupados correctamente.
+            @cast _[(m1,m2),(n1,n2),sigma_t_plus] := new_tensor_[m1,m2,n1,n2,sigma_t_plus]
+
+        # Crea el nuevo TensorTrain con los tensores actualizados.
+        end |> TensorTrain
+        B = distribution_swap(B, s)
+        compress!(B; svd_trunc=TruncBond(max_bound)) 
+        normalize!(B)
+        if save
+            push!(lista_B_T, B)
+        end
+    end
+    if save
+        return lista_B_T
+    else
+        return B
+    end
+end
+
+
+
 # ============================================================================
 
 # ============================================
@@ -453,3 +511,25 @@ function parallel_random_P0_fixed(N)
     return P0
 end
     
+
+
+swap(i) = (i == 1 ? 1 : i == 2 ? 3 : i == 3 ? 2 : i == 4 ? 4 : error("swap solo definido para i=1..4"))
+
+function swapping_tt(B)
+    for i in 1:length(B.tensors)
+        B_i_new = zeros(size(B.tensors[i])...)
+        for k in 1:4
+            B_i_new[:,:, k] = B.tensors[i][:,:, swap(k)] 
+        end
+        B.tensors[i] = B_i_new
+    end
+    return B
+end
+
+
+function distribution_swap(B, s)
+    B.z = B.z * (1-s)
+    B_swap = swapping_tt(B)
+    B_swap.z = B_swap.z * s
+    return B + B_swap
+end
