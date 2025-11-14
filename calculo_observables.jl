@@ -75,10 +75,11 @@ end
     a partir del TensorTrain B que representa la distribución conjunta.
 """
 function marginal_expected_value_parallel(B, k)
-    function suma(a,b,B=B,k=k)
-        return marginal_distribution(B, k)[a] + marginal_distribution(B, k)[b]
-    end
-    return  (suma(1,3)*(-1) + suma(2,4)*(1), suma(1,2)*(-1) + suma(3,4)*(1))
+    dist = marginal_distribution(B, k)
+    return (
+        (dist[1] + dist[3]) * (-1) + (dist[2] + dist[4]) * (1),
+        (dist[1] + dist[2]) * (-1) + (dist[3] + dist[4]) * (1)
+    )
 end
 
 """
