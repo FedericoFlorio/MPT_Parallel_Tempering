@@ -1,0 +1,5 @@
+[deps]
+GlauberPT = "cd1fa12f-b0ed-4c0a-9796-002e8e80502a"
+
+[sources]
+GlauberPT = {path = "/media/julian/Nuevo vol/UNIVERSIDAD/Investigación_Mulet/Parallel_Tempering_Italia/Codigos/MPT_Parallel_Tempering/GlauberPT.jl"}

@@ -189,6 +189,47 @@ function sequential_update!(spins, beta, j_vector, h_vector, p0, rng)
     spins[i] = rand(rng) < p_up ? 1 : -1
 end
 
+
+
+# AGREGAR después de sequential_update!
+function sequential_update_with_energy!(spins, beta, j_vector, h_vector, p0, rng)
+    N = length(spins)
+    i = rand(rng, 1:N)
+    
+    # Calcular ΔE si se flippea
+    delta_E = compute_local_energy_change(spins, i, j_vector, h_vector)
+    
+    # Preparar vecinos
+    if i == 1
+        sigma_neighbors = [spins[1], spins[2]]
+    elseif i == N
+        sigma_neighbors = [spins[N-1], spins[N]]
+    else
+        sigma_neighbors = [spins[i-1], spins[i], spins[i+1]]
+    end
+    
+    # Calcular probabilidades
+    p_up = glauber_transition_rate(sigma_neighbors, 1, i, beta, j_vector, h_vector, 0.0)
+    p_down = glauber_transition_rate(sigma_neighbors, -1, i, beta, j_vector, h_vector, 0.0)
+    
+    p_total = p_up + p_down
+    p_up /= p_total
+    
+    old_spin = spins[i]
+    spins[i] = rand(rng) < p_up ? 1 : -1
+    
+    # Si cambió, retornar ΔE; si no, retornar 0
+    if spins[i] != old_spin
+        return delta_E
+    else
+        return 0.0
+    end
+end
+
+
+
+
+
 # ============================================
 # UPDATE METROPOLIS
 # ============================================
@@ -248,6 +289,31 @@ function metropolis_update!(spins, beta, j_vector, h_vector, rng)
     return accepted
 end
 
+
+# AGREGAR después de metropolis_update!
+function metropolis_update_with_energy!(spins, beta, j_vector, h_vector, rng)
+    N = length(spins)
+    i = rand(rng, 1:N)
+    
+    delta_E = compute_local_energy_change(spins, i, j_vector, h_vector)
+    
+    accepted = false
+    if delta_E <= 0
+        spins[i] = -spins[i]
+        accepted = true
+    else
+        if rand(rng) < exp(-beta * delta_E)
+            spins[i] = -spins[i]
+            accepted = true
+        end
+    end
+    
+    return accepted, delta_E
+end
+
+
+
+
 # ============================================
 # FUNCIONES DE ALTO NIVEL
 # ============================================
@@ -280,6 +346,33 @@ function apply_update!(spins, spins_new, update_rule::Symbol, beta,
     end
 end
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # ============================================
 # INFORMACIÓN Y DEBUGGING
 # ============================================
@@ -289,6 +382,8 @@ end
 
 Estima la tasa de aceptación de Metropolis para una configuración dada.
 Útil para diagnosticar si la temperatura es apropiada.
+"""
+
 """
 function estimate_acceptance_rate(spins, beta, j_vector, h_vector, n_steps::Int, rng)
     spins_copy = copy(spins)
@@ -302,6 +397,7 @@ function estimate_acceptance_rate(spins, beta, j_vector, h_vector, n_steps::Int,
     
     return acceptances / n_steps
 end
+"""
 
 """
 Información sobre las dinámicas implementadas:
